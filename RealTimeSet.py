@@ -3,65 +3,40 @@ from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 import threading
 import pymysql
-import time
-
-def data_cumulative():
-    print("swich on")
-    threading.Timer(15, data_cumulative).start()
-    answer = dict()
-    for code in stocks:
-        if len(stocks_dict[code]) != 0:
-            Open = stocks_dict[code][0][0];
-            Low = 0;
-            High = 0;
-            Close = stocks_dict[code][-1][-2];
-            Volume = 0
-            for stock_list in stocks_dict[code]:
-                for i in range(1, 5):
-                    if stock_list[i] < Low:
-                        Low = stock_list[i]
-                    if stock_list[i] > High:
-                        High = stock_list[i]
-                Volume += stock_list[-1]
-            answer[code] = [code, Open, High, Low, Close, Volume]
-    print(answer)
-    return answer
 
 class MyWindow(QMainWindow):
+
     # 프로그램 초기화.
     def __init__(self):
         super().__init__()
 
-        """생성자: MariaDB 연결 및 종목코드 딕셔너리 생성"""
         self.conn = pymysql.connect(host='localhost', port=3306, user='root',
                                     password='1234', db='INVESTAR', charset='utf8')
 
+        # 실시간 데이터 담을 테이블 없으면 생성.
         with self.conn.cursor() as curs:
-            sql = """ 
-            CREATE TABLE IF NOT EXISTS daily_info ( 
-                code VARCHAR(20),
-                company VARCHAR(40),
-                last_update DATETIME,
-                PRIMARY KEY (code))
-            """
-            curs.execute(sql)
-
             sql = """
             CREATE TABLE IF NOT EXISTS daily_stocks(
                 code VARCHAR(20),
+                Date DATETIME,
                 Open BIGINT(20),
                 High BIGINT(20),
                 Low BIGINT(20),
                 Close BIGINT(20),
-                Volume BIGINT(20),
-                PRIMARY KEY (code))
+                Volume BIGINT(20))
             """
             curs.execute(sql)
+
+        # 가져오기 구독 할 종목 코드 DB에서.
+        with self.conn.cursor(pymysql.cursors.DictCursor) as curs:
+            sql = "SELECT code FROM investar.company_info;"
+            curs.execute(query=sql)
+            global stocks
+            stocks = [code["code"] for code in curs.fetchall()]
         self.conn.commit()
 
         self.setWindowTitle("RealTimeSet")
         self.setGeometry(1200, 300, 300, 300)
-
         btn = QPushButton("Register", self)
         btn.move(20, 20)
         btn.clicked.connect(self.btn_clicked)
@@ -85,56 +60,71 @@ class MyWindow(QMainWindow):
         if err_code == 0:
             self.statusBar().showMessage("login 완료")
 
+    # 60초 마다 쌓은 종목 데이터를 가공해서 DB에 저장.
+    def data_cumulative(self):
+        threading.Timer(60, self.data_cumulative).start()
+        answer = dict()
+        for code in stocks_dict.keys():
+            Open = stocks_dict[code][0][0];
+            High = stocks_dict[code][0][0];
+            Low = stocks_dict[code][0][0];
+            Close = stocks_dict[code][-1][0];
+            Volume = 0
+            for stock_list in stocks_dict[code]:
+                if stock_list[0] > High:
+                    High = stock_list[0]
+                if stock_list[0] < Low:
+                    Low = stock_list[0]
+                Volume += stock_list[1]
+            answer[code] = [Open, High, Low, Close, Volume]
+        if len(answer) > 0:
+            with self.conn.cursor() as curs:
+                for code in answer.keys():
+                    sql = f"INSERT INTO daily_stocks (code, Date, Open, High, Low, Close, Volume)" \
+                          f"VALUES ('{code}', DATE_FORMAT(now(),'%Y-%m-%d-%h-%i'),{answer[code][0]}, {answer[code][1]}, {answer[code][2]},{answer[code][3]}, {answer[code][4]});"
+                    curs.execute(sql)
+                    self.conn.commit()
+                stocks_dict.clear()
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+                print(f"{len(answer)}개의 종목 DB 저장 성공.")
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     # 등록 버튼.
     def btn_clicked(self):
         push_codes = ""
+        push_fids = ""
         for crnt in stocks:
             push_codes += crnt+";"
-        # 3번째 매개변수 fid 10은 현재가를 의미하고, 여러개 등록 가능.
-        # 시장에서 fid에 변화가 일어나면 이벤트 일어남.
+        for crnt in fids:
+            push_fids += crnt+";"
         self.ocx.dynamicCall("SetRealReg(QString, QString, QString, QString)",
-                             "0101", push_codes, "10", "1")
-        print(f"{stocks} 등록 완료.", end="\n\n")
-        try:
-            recive = data_cumulative()  # 5분마다 실행.
-            with self.conn.cursor() as curs:
-                for key in recive.keys():
-                    sql = f"INSERT INTO daily_stocks (code, Open, High, Low, Close, Volume" \
-                          f") VALUES ({recive[key][0]}, {recive[key][1]}, {recive[key][2]}, {recive[key][3]}," \
-                          f"{recive[key][4]}, {recive[key][5]});"
-                    print(sql)
-                    curs.execute(sql)
-                self.conn.commit()
-            print("1분 DB 저장 성공.")
-        except:
-            print("1분 DB 저장 실패.")
+                             "0101", f"{push_codes}", f"{push_fids}", "1")
+        print(f"{len(stocks)}개 등록 완료.", end="\n\n")
+        self.data_cumulative()
+
 
     # 해제 버튼.
     def btn2_clicked(self):
         self.ocx.dynamicCall("DisConnectRealData(QString)", "0101")
-        print(f"{stocks} 해제 완료.", end="\n\n")
+        print(f"{len(stocks)}개 해제 완료.", end="\n\n")
+        threading.Timer(60, self.data_cumulative).cancel()
 
     # init에 OnReceiveRealData과 연결.
     def _handler_real_data(self, code, real_type, data):
-        # ["start_price", "low_price", "high_price", "end_price", "trading_volume"]
-        recive_fids = [16, 18, 17, 10, 15, 20, 25, 11, 12, 13, 202, 204, 206, 208,
-                       2010, 212, 212, 214,215,216,917,916,302,
-                       27,28, 214, 215]
         recived_list = []
-
-        # 키움 Api 내부에선 c++로 동작하기 때문에, dynamicCall 함수로 보내 줘야함.
         for fid in recive_fids:
             recived_list.append(abs(int(self.ocx.dynamicCall("GetCommRealData(QString, int)", code, fid))))
-        stocks_dict[code].append(recived_list)
-        # print(stocks_dict)
+        if code in stocks_dict:
+            stocks_dict[code].append(recived_list)
+        else:
+            stocks_dict[code] = [recived_list]
         print(f"{code} 임시 저장 완료.")
 
 if __name__ == "__main__":
-    DB = [] # 이게 일단 DB라고 가정.
-
-    # 구독 할 종목 설정.
-    stocks = ["004000", "063170", "009520", "121800", "064260"]
-    stocks_dict = dict((crnt,[[1,2,3,4,5,6]]) for crnt in stocks)
+    # 10 : 현재가, 15 : 거래량
+    fids = ["10", "15"]
+    recive_fids = [10, 15]
+    stocks = []
+    stocks_dict = dict()
 
     app = QApplication(sys.argv)
     window = MyWindow()
