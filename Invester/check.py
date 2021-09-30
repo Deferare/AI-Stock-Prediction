@@ -5,12 +5,8 @@ class Turn:
     def __init__(self):
         return
 
-    def labeling(self, row_data):
+    def labeling(self, S, H, L, E):
         """캔들 모양 라벨링"""
-        S = row_data['Open']
-        E = row_data['Close']
-        H = row_data['High']
-        L = row_data['Low']
 
         up_down_state = E-S
         if up_down_state > 0:
