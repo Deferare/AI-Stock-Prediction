@@ -1,20 +1,5 @@
 
-def candle_save(df, path, mpf):
-    rc = {
-        "axes.labelcolor": "none",
-        "axes.spines.bottom": False,
-        "axes.spines.left": False,
-        "axes.spines.right": False,
-        "axes.spines.top": False,
-        "font.size": 0,
-        "xtick.color": "none",
-        "ytick.color": "none",
-    }
-    mc = mpf.make_marketcolors(up='red', down='blue', alpha=1.0, inherit=True)
-    style_final = mpf.make_mpf_style(marketcolors=mc, rc=rc, facecolor="white", figcolor='white')
-    # mpf.plot(df, type='candle', style=style_final, savefig=path)
-    mpf.plotting.plt.plot(df, type='candle', style=style_final, savefig=path)
-    mpf.plotting.plt.clf()
+
 
 def labeling(S, H, L, E):
     """캔들 모양 라벨링"""
