@@ -3,6 +3,9 @@ from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 import threading
 import pymysql
+from Invester import cnn_save
+from Invester import draw_test_data
+import pandas as pd
 
 class MyWindow(QMainWindow):
 
@@ -59,6 +62,25 @@ class MyWindow(QMainWindow):
         if err_code == 0:
             self.statusBar().showMessage("login 완료")
 
+    # db에서 최대 20개만 가져와서 반전형이면 이미지 만들어서 test폴더에 저장
+    def re_main(self, code):
+        print(code, '확인 중...')
+        with self.conn.cursor() as curs:
+            sql = f"SELECT Date, Open, High, Low, Close from daily_stocks WHERE code = {code} AND Date >= date_sub(now(), interval 20 minute)"
+            curs.execute(sql)
+            rows = curs.fetchall()
+        if len(rows) >= 2:
+            D = '직선형'
+            rows_df = pd.DataFrame(rows[:-1])
+            row = rows[-1]
+            H, H_idx, L, L_idx, D = datamk.morethan(rows_df)
+            full_rows_df = pd.DataFrame(rows)
+            high = row[2]
+            low = row[3]
+            H, H_idx = datamk.High(H, H_idx, high)
+            L, L_idx = datamk.Low(L, L_idx, low)
+            draw.turn_check2(D, H_idx, L_idx, full_rows_df, code)
+
     # 60초 마다 쌓은 종목 데이터를 가공해서 DB에 저장.
     def data_cumulative(self):
         threading.Timer(60, self.data_cumulative).start()
@@ -92,13 +114,15 @@ class MyWindow(QMainWindow):
                 stocks_dict[code] = [[Open, High, Low, Close, Volume]]
                 with self.conn.cursor() as curs:
                     sql = f"INSERT INTO daily_stocks (code, Date, Open, High, Low, Close, Volume)" \
-                          f"VALUES ('{code}', DATE_FORMAT(now(),'%Y-%m-%d-%h-%i'),{stocks_dict[code][0][0]},{stocks_dict[code][0][1]}, {stocks_dict[code][0][2]},{stocks_dict[code][0][3]}, {stocks_dict[code][0][4]});"
+                          f"VALUES ('{code}', DATE_FORMAT(now(),%h-%i'),{stocks_dict[code][0][0]},{stocks_dict[code][0][1]}, {stocks_dict[code][0][2]},{stocks_dict[code][0][3]}, {stocks_dict[code][0][4]});"
                     curs.execute(sql)
+                self.re_main(code)
                 insert_count += 1
         self.conn.commit()
         print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         print(f"{insert_count}개의 종목 DB 저장 성공.")
         print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+
     # 등록 버튼.
     def btn_clicked(self):
         push_codes = ""
@@ -111,6 +135,7 @@ class MyWindow(QMainWindow):
                              "0101", f"{push_codes}", f"{push_fids}", "1")
         print(f"{len(stocks_dict)}개 구독 등록 완료.", end="\n\n")
         self.data_cumulative()
+
 
     # 해제 버튼.
     def btn2_clicked(self):
@@ -127,11 +152,11 @@ class MyWindow(QMainWindow):
         stocks_dict[code].append(recived_list)
         print(f"{code} 임시 저장 완료.")
 
-    def closeEvent(self, event):
-        self.deleteLater()
-
 if __name__ == "__main__":
     # 10 : 현재가, 15 : 거래량
+    draw = cnn_save.Turn()
+    datamk = draw_test_data.Test_data()
+
     subscription_fids = ["10", "15"]
     request_fids = [10, 15]
     stocks_dict = dict()
