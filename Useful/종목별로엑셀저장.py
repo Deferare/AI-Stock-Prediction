@@ -9,7 +9,6 @@ conn = pymysql.connect(host='localhost', port=3306, user='root',
 
 # DB에 있는 data가져와서 Dict(key=code, value=DataFrame)로 가공.
 with conn.cursor(pymysql.cursors.DictCursor) as curs:
-    # sql = "SELECT * FROM investar.min_price where Date > '2010-01-01' and (code = 241590 or code = 034120 or code = 363280 or code = 006125 or code = 161890 or code = 003690 or code = 001800 or code = 284740 or code = 395400);"
     sql = "SELECT * FROM investar.min_price;"
     curs.execute(query=sql)
     get_datas = curs.fetchall()

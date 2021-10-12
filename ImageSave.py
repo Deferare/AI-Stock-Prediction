@@ -4,7 +4,8 @@ import pandas as pd
 import pymysql
 import sys
 import mplfinance as mpf
-from Useful import labeling
+from Useful import MyLabeling
+
 matplotlib.use("Agg")
 sys.setrecursionlimit(100000)
 
@@ -44,7 +45,7 @@ for code in codes:
     save = dict(dpi=40, transparent=True, bbox_inches='tight', facecolor="black")
     i = 30
     while i < len(stock_data):
-        label_value_1 = labeling.labeling(S=stock_data["Open"][i], H=stock_data["High"][i], L=stock_data["Low"][i], E=stock_data["Close"][i])
+        label_value_1 = MyLabeling.myLabeling(S=stock_data["Open"][i], H=stock_data["High"][i], L=stock_data["Low"][i], E=stock_data["Close"][i])
         if label_value == "U1" or label_value == "D1":
             if label_value == "U1":
                 label_value = 0
