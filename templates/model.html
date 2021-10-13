@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+<body>
+    <form action="/" method="post">
+        <p><label for="code">종목 코드</label><input type="text" name="code" id="code"></p>
+        <button type="submit">검색</button>
+    </form>
+
+    {% if data %}
+    <div id="result">
+        <div>{{data}}</div>
+    {% endif %}
+</body>
+</html>

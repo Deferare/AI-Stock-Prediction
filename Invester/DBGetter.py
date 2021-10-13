@@ -3,12 +3,12 @@ import pandas as pd
 import numpy as np
 
 # DB에 있는 data가져와서 Dict(key=code, value=DataFrame)구조로 리턴.
-def dbGetter(option:dict()):
+def dbGetter(sql):
     conn = pymysql.connect(host='localhost', port=3306, user='root',
                                 password='1234', db='INVESTAR', charset='utf8')
     with conn.cursor(pymysql.cursors.DictCursor) as curs:
         # "SELECT * FROM investar.min_price where Date;"
-        curs.execute(query=option["sql"])
+        curs.execute(query=sql)
         get_datas = curs.fetchall()
         datas = dict()
         codes = []

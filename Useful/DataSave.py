@@ -2,7 +2,8 @@ import pandas as pd
 from Useful.MyLabeling import myLabeling as myl
 import mplfinance as mpf
 import matplotlib
-
+from PIL import Image
+import numpy as np
 matplotlib.use("Agg")
 
 rc = {
@@ -15,12 +16,12 @@ rc = {
     "xtick.color": "none",
     "ytick.color": "none",
 }
+mc = mpf.make_marketcolors(up='red', down='blue', inherit=True)
+style_final = mpf.make_mpf_style(marketcolors=mc, rc=rc)
+save = dict(dpi=100, transparent=True, bbox_inches='tight', facecolor="black")
 
-# {"code":DataFrame},
-def trainImageSave(datas, option:dict):
-    mc = mpf.make_marketcolors(up='red', down='blue', inherit=True)
-    style_final = mpf.make_mpf_style(marketcolors=mc, rc=rc)
-    save = dict(dpi=100, transparent=True, bbox_inches='tight', facecolor="black")
+# {"code":DataFrame}, path:str
+def trainImageSave(datas, path):
     lables = []
     index = 0
     for code in datas.keys():
@@ -36,12 +37,24 @@ def trainImageSave(datas, option:dict):
             elif label_value_1 == "D1" and label_value_2 == "D1" and label_value_3 == "D1":
                 label_value = 1
             if label_value != -1:
-                path = f"{option['path']}/{index}.jpg"
-                save["fname"] = path
+                path_sub = f"{path}/{index}.jpg"
+                save["fname"] = path_sub
                 mpf.plot(data[i-15:i], type='candle', style=style_final, figsize=(3,1.5), savefig=save)
                 lables.append(label_value)
                 index += 1
                 i += 17
             i += 1
         print(f"{index} - {code} 저장 완료.")
-    pd.DataFrame(lables).to_excel(option['path']+'/Labels.xlsx', index=False)
+    pd.DataFrame(lables).to_excel(path+'/Labels.xlsx', index=False)
+
+def getImage(stock:dict):
+    image_path = "C:/Users/ad/Desktop/Github/AI-Stock-Prediction/ImageData/test/temporary_image.jpg"
+    for code in stock.keys():
+        data = stock[code]
+        save["fname"] = image_path
+        mpf.plot(stock[code], type='candle', style=style_final, figsize=(3, 1.5), savefig=save)
+
+    image = Image.open(image_path)
+    image = Image.Image.resize(image, (256, 138))
+    return np.array(image) / 255
+
