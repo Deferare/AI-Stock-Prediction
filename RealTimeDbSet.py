@@ -99,33 +99,48 @@ class MyWindow(QMainWindow):
         print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         print(f"{insert_count}개의 종목 DB 저장 성공.")
         print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+
     # 등록 버튼.
     def btn_clicked(self):
-        push_codes = ""
         push_fids = ""
-        for crnt in stocks_dict.keys():
-            push_codes += crnt+";"
         for crnt in subscription_fids:
             push_fids += crnt+";"
-        self.ocx.dynamicCall("SetRealReg(QString, QString, QString, QString)",
-                             "0101", f"{push_codes}", f"{push_fids}", "1")
+        push_codes = ""
+        screen_num = 1000
+        num = 0
+        for code in stocks_dict.keys():
+            num += 1
+            push_codes += code+";"
+            if num%100 == 0:
+                screen_nums.append(f"{screen_num}")
+                self.ocx.dynamicCall("SetRealReg(QString, QString, QString, QString)",
+                                     f"{screen_num}", f"{push_codes}", f"{push_fids}", "1")
+                screen_num += 1
+                num = 0
+                push_codes = ""
+        if num > 0:
+            screen_num += 1
+            screen_nums.append(f"{screen_num}")
+            self.ocx.dynamicCall("SetRealReg(QString, QString, QString, QString)",
+                                 f"{screen_num}", f"{push_codes}", f"{push_fids}", "1")
         print(f"{len(stocks_dict)}개 구독 등록 완료.", end="\n\n")
         self.data_cumulative()
 
     # 해제 버튼.
     def btn2_clicked(self):
-        self.ocx.dynamicCall("DisConnectRealData(QString)", "0101")
+        for screen_num in screen_nums:
+            self.ocx.dynamicCall("DisConnectRealData(QString)", f"{screen_num}")
         print(f"{len(stocks_dict)}개 구독 해제 완료.", end="\n\n")
         threading.Timer(60, self.data_cumulative).cancel()
 
     # init에 OnReceiveRealData과 연결.
     def _handler_real_data(self, code, real_type, data):
-        global stocks_dict
-        recived_list = []
-        for fid in request_fids:
-            recived_list.append(abs(int(self.ocx.dynamicCall("GetCommRealData(QString, int)", code, fid))))
-        stocks_dict[code].append(recived_list)
-        print(f"{code} 임시 저장 완료.")
+        if real_type == "주식체결":
+            data2 = list(map(str,str(data).split()))
+            global stocks_dict
+            recived_list = [abs(int(data2[1])), abs(int(data2[6]))]
+            stocks_dict[code].append(recived_list)
+            print(f"{code} 임시 저장 완료.")
 
     def closeEvent(self, event):
         self.deleteLater()
@@ -133,7 +148,7 @@ class MyWindow(QMainWindow):
 if __name__ == "__main__":
     # 10 : 현재가, 15 : 거래량
     subscription_fids = ["10", "15"]
-    request_fids = [10, 15]
+    screen_nums = []
     stocks_dict = dict()
 
     app = QApplication(sys.argv)
